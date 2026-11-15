@@ -1,3 +1,4 @@
+# secrets / local config
 .env
 .env.*
 !.env.example
@@ -12,7 +13,18 @@ secrets.*
 credentials*.json
 .npmrc
 .pypirc
+
+# tooling
 node_modules/
 __pycache__/
 .venv/
 venv/
+dist/
+tsconfig.tsbuildinfo
+
+# bundled verification scripts and generated fixtures
+tools/*.mjs
+tools/dicomtest/
+tools/shots/
+tools/series-list.json
+tools/seed-out.json

@@ -1,0 +1,38 @@
+{
+  "name": "tavr-planning-station",
+  "version": "1.0.0",
+  "description": "TAVR 术前测量与虚拟释放系统",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "check": "tsc --noEmit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/perfreetp/misty-grove.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/perfreetp/misty-grove/issues"
+  },
+  "homepage": "https://github.com/perfreetp/misty-grove#readme",
+  "dependencies": {
+    "dicom-parser": "^1.8.21",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "@webgpu/types": "^0.1.52",
+    "playwright": "^1.65.1",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}
