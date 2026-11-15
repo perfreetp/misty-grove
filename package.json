@@ -1,0 +1,29 @@
+{
+  "name": "capsule-endoscopy-workbench",
+  "version": "1.0.0",
+  "description": "胶囊内镜图像序列阅片与报告发布工作台 — 原生 TypeScript + Canvas 2D + IndexedDB",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "typecheck": "tsc -b --pretty false",
+    "test:e2e": "playwright test"
+  },
+  "keywords": [
+    "capsule-endoscopy",
+    "medical-imaging",
+    "canvas2d",
+    "indexeddb",
+    "typescript"
+  ],
+  "author": "",
+  "license": "MIT",
+  "type": "module",
+  "devDependencies": {
+    "@playwright/test": "^1.65.1",
+    "playwright": "^1.65.1",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.8"
+  },
+  "private": true
+}
