@@ -1,0 +1,26 @@
+{
+  "name": "footbridge-clearance-system",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx src/lib/engine.test.ts && tsx src/lib/store.test.ts",
+    "e2e": "tsx scripts/e2e-smoke.ts"
+  },
+  "dependencies": {
+    "solid-js": "^1.9.3",
+    "three": "^0.171.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.171.0",
+    "puppeteer-core": "^25.17.0",
+    "tsx": "^4.23.15",
+    "typescript": "~5.7.2",
+    "vite": "^6.0.7",
+    "vite-plugin-solid": "^2.11.0"
+  }
+}
