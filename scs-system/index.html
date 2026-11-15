@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SCS 术后程控与随访系统 · 疼痛科</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <!-- ===== 顶栏 ===== -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">⚡</span>
+      <div>
+        <div class="title">SCS 术后程控与随访系统</div>
+        <div class="subtitle">脊髓电刺激 · 触点覆盖模拟 · 疼痛科</div>
+      </div>
+    </div>
+    <div class="top-controls">
+      <label class="ctl">
+        <span>当前角色</span>
+        <select v-model="role">
+          <option value="physician">疼痛科医师</option>
+          <option value="technician">器械技师</option>
+          <option value="nurse">随访护士</option>
+        </select>
+      </label>
+      <label class="ctl">
+        <span>当前患者</span>
+        <select v-model="currentPatientId">
+          <option value="">— 未选择 —</option>
+          <option v-for="p in db.patients" :key="p.id" :value="p.id">{{ p.name }}（{{ p.mrn }}）</option>
+        </select>
+      </label>
+    </div>
+  </header>
+
+  <!-- ===== 模块导航 ===== -->
+  <nav class="tabs">
+    <button v-for="t in tabs" :key="t.key" :class="{active: tab===t.key}" @click="tab=t.key">
+      <span class="tab-icon">{{ t.icon }}</span>{{ t.label }}
+    </button>
+  </nav>
+
+  <div class="toast" v-if="toast.show" :class="toast.type">{{ toast.msg }}</div>
+
+  <main>
+    <!-- ================================================= -->
+    <!-- 模块一：植入登记                                   -->
+    <!-- ================================================= -->
+    <section v-if="tab==='register'" class="module">
+      <div class="grid-2">
+        <div class="card">
+          <h2>{{ editingPatientId ? '编辑患者 / 植入信息' : '新患者植入登记' }}</h2>
+          <div class="form-grid">
+            <label>姓名<input v-model.trim="regForm.name" placeholder="患者姓名"></label>
+            <label>病历号<input v-model.trim="regForm.mrn" placeholder="住院/门诊号"></label>
+            <label>年龄<input type="number" min="1" max="120" v-model.number="regForm.age"></label>
+            <label>性别
+              <select v-model="regForm.sex"><option>男</option><option>女</option></select>
+            </label>
+            <label>主管医师<input v-model.trim="regForm.physician" placeholder="疼痛科医师"></label>
+            <label>诊断<input v-model.trim="regForm.diagnosis" placeholder="如：带状疱疹后神经痛"></label>
+            <label>植入日期<input type="date" v-model="regForm.implantDate"></label>
+            <label>术前 VAS（0-10）<input type="number" min="0" max="10" step="1" v-model.number="regForm.baselineVas"></label>
+          </div>
+
+          <h3>电极配置</h3>
+          <div class="form-grid">
+            <label>电极型号
+              <select v-model.number="regForm.leadModel">
+                <option :value="8">8 触点（单列）</option>
+                <option :value="16">16 触点（双列 2×8）</option>
+              </select>
+            </label>
+            <label>植入左右侧
+              <select v-model="regForm.side">
+                <option value="left">左侧</option>
+                <option value="right">右侧</option>
+                <option value="bilateral">双侧</option>
+              </select>
+            </label>
+          </div>
+          <div class="seg-picker">
+            <div class="seg-title">植入节段（触点将按所选节段范围排布）</div>
+            <label v-for="s in implantSegments" :key="s" class="seg-chip" :class="{on: regForm.segments.includes(s)}">
+              <input type="checkbox" :value="s" v-model="regForm.segments">{{ s }}
+            </label>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn primary" @click="saveRegistration" :disabled="!canRegister">
+              {{ editingPatientId ? '保存修改（将重建触点布局）' : '登记并生成触点布局' }}
+            </button>
+            <button class="btn" v-if="editingPatientId" @click="resetRegForm">取消编辑</button>
+          </div>
+          <p class="hint" v-if="!canRegister">仅疼痛科医师可执行植入登记，请在右上角切换角色。</p>
+        </div>
+
+        <div class="card">
+          <h2>已登记患者（{{ db.patients.length }}）</h2>
+          <table class="tbl" v-if="db.patients.length">
+            <thead><tr><th>姓名</th><th>病历号</th><th>医师</th><th>电极</th><th>节段</th><th>侧别</th><th>术前VAS</th><th></th></tr></thead>
+            <tbody>
+              <tr v-for="p in db.patients" :key="p.id" :class="{sel: p.id===currentPatientId}">
+                <td>{{ p.name }}</td><td>{{ p.mrn }}</td><td>{{ p.physician }}</td>
+                <td>{{ p.implant.leadModel }} 触点</td>
+                <td>{{ p.implant.segments.join('/') }}</td>
+                <td>{{ sideLabel(p.implant.side) }}</td>
+                <td>{{ p.baselineVas }}</td>
+                <td class="ops">
+                  <button class="btn xs" @click="selectPatient(p.id)">选中</button>
+                  <button class="btn xs" @click="editPatient(p)" v-if="canRegister">编辑</button>
+                  <button class="btn xs danger" @click="deletePatient(p)" v-if="canRegister">删除</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="hint" v-else>暂无患者，请先登记。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================= -->
+    <!-- 模块二：电极配置                                   -->
+    <!-- ================================================= -->
+    <section v-if="tab==='electrode'" class="module">
+      <div v-if="!currentPatient" class="card empty">请先在「植入登记」选择或登记患者。</div>
+      <div class="grid-elec" v-else>
+        <div class="card">
+          <h2>触点布局 — {{ currentPatient.name }}（{{ currentPatient.implant.leadModel }} 触点 · {{ sideLabel(currentPatient.implant.side) }} · {{ currentPatient.implant.segments.join('/') }}）</h2>
+          <div class="elec-wrap">
+            <svg :viewBox="'0 0 260 820'" class="elec-svg">
+              <!-- 中线参考 -->
+              <line x1="130" y1="30" x2="130" y2="800" stroke="#cbd5e1" stroke-dasharray="4 6"/>
+              <text x="130" y="22" text-anchor="middle" class="svg-note">中线</text>
+              <!-- 节段刻度 -->
+              <g v-for="(d,i) in dermList" :key="d">
+                <text v-if="currentPatient.implant.segments.includes(d)" :x="8" :y="bandYC(i)+4" class="svg-seg">{{ d }}</text>
+              </g>
+              <!-- 触点 -->
+              <g v-for="c in currentPatient.contacts" :key="c.id">
+                <circle :cx="contactX(c)" :cy="c.y" r="17"
+                        :class="['contact', c.polarity, {active: c.polarity!=='off' && c.current>0}]"
+                        @click="cyclePolarity(c)"/>
+                <text :x="contactX(c)" :y="c.y+5" text-anchor="middle" class="contact-sym">{{ polaritySymbol(c) }}</text>
+                <text :x="contactX(c)-26" :y="c.y+4" text-anchor="end" class="contact-no">#{{ c.id }}</text>
+                <text :x="contactX(c)+26" :y="c.y+4" class="contact-cur" v-if="c.polarity!=='off'">{{ c.current }}%</text>
+              </g>
+            </svg>
+            <div class="elec-side">
+              <div class="total-box" :class="{blocked: blockFlash}">
+                <div class="total-label">总电流（上限 {{ totalLimit }}%）</div>
+                <div class="total-bar"><div class="total-fill" :style="{width: Math.min(100,totalCurrent)+'%'}"></div></div>
+                <div class="total-num">{{ totalCurrent }}% / {{ totalLimit }}%</div>
+                <div class="block-msg" v-if="blockFlash">⚠ 总电流超限，已拦截</div>
+              </div>
+              <p class="hint">点击触点可循环切换极性：关闭 → 阴极(−) → 阳极(+)。拖动右侧滑块调节电流。</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>触点参数</h2>
+          <div class="contact-list">
+            <div v-for="c in currentPatient.contacts" :key="c.id" class="contact-row" :class="{off: c.polarity==='off'}">
+              <span class="cno">#{{ c.id }}</span>
+              <button class="pol-btn" :class="c.polarity" @click="cyclePolarity(c)" :disabled="!canProgram">{{ polarityLabel(c) }}</button>
+              <input type="range" min="0" max="100" step="1" :value="c.current"
+                     :disabled="c.polarity==='off' || !canProgram"
+                     @input="onCurrentInput(c, $event)">
+              <span class="cval">{{ c.polarity==='off' ? '—' : c.current + '%' }}</span>
+            </div>
+          </div>
+          <div class="btn-row">
+            <button class="btn" @click="allOff" :disabled="!canProgram">全部关闭</button>
+            <button class="btn" @click="resetCurrents" :disabled="!canProgram">电流清零</button>
+          </div>
+          <p class="hint" v-if="!canProgram">当前角色不可调整参数（需器械技师或医师）。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================= -->
+    <!-- 模块三：覆盖模拟                                   -->
+    <!-- ================================================= -->
+    <section v-if="tab==='coverage'" class="module">
+      <div v-if="!currentPatient" class="card empty">请先在「植入登记」选择或登记患者。</div>
+      <div class="grid-cov" v-else>
+        <div class="card">
+          <h2>皮节覆盖模拟 — 点击皮节带标记/取消患者疼痛区域</h2>
+          <div class="cov-wrap">
+            <svg viewBox="0 0 400 820" class="body-svg" ref="bodySvg">
+              <defs>
+                <clipPath id="bodyClip">
+                  <circle cx="200" cy="52" r="34"/>
+                  <path d="M168,92 C150,100 118,112 100,128 C88,140 84,160 86,180 C90,240 96,300 104,352 C108,382 104,404 112,428 C122,452 130,470 132,500 L138,768 Q139,786 156,786 L182,786 Q192,786 192,772 L194,560 Q196,540 200,540 Q204,540 206,560 L208,772 Q208,786 218,786 L244,786 Q261,786 262,768 L268,500 C270,470 278,452 288,428 C296,404 292,382 296,352 C304,300 310,240 314,180 C316,160 312,140 300,128 C282,112 250,100 232,92 C224,88 216,86 200,86 C184,86 176,88 168,92 Z"/>
+                  <path d="M100,128 C80,142 70,182 68,242 L66,330 Q66,346 79,346 L87,346 Q96,346 97,332 L102,250 C104,218 108,188 112,168 Z"/>
+                  <path d="M300,128 C320,142 330,182 332,242 L334,330 Q334,346 321,346 L313,346 Q304,346 303,332 L298,250 C296,218 292,188 288,168 Z"/>
+                </clipPath>
+              </defs>
+              <!-- 底图 -->
+              <g clip-path="url(#bodyClip)">
+                <rect x="0" y="0" width="400" height="820" fill="#f1f5f9"/>
+                <!-- 基础皮节带 -->
+                <rect v-for="(d,i) in dermList" :key="'b'+d" x="0" :y="bandY0(i)" width="400" :height="bandH"
+                      :fill="i%2? '#e8eef5':'#eef3f9'"/>
+                <!-- 刺激覆盖层（蓝，按电流强度叠色） -->
+                <rect v-for="(d,i) in dermList" :key="'c'+d" x="0" :y="bandY0(i)" width="400" :height="bandH"
+                      :fill="'#2563eb'" :opacity="coverageOpacity(i)"/>
+                <!-- 疼痛区域层（橙红半透明） -->
+                <rect v-for="(d,i) in dermList" :key="'p'+d" x="0" :y="bandY0(i)" width="400" :height="bandH"
+                      fill="#f97316" :opacity="isPain(d)? 0.55 : 0"/>
+                <!-- 分隔线 -->
+                <line v-for="(d,i) in dermList" :key="'l'+d" x1="0" :y1="bandY0(i)" x2="400" :y2="bandY0(i)" stroke="#cbd5e1" stroke-width="0.6"/>
+              </g>
+              <!-- 轮廓 -->
+              <g class="body-outline">
+                <circle cx="200" cy="52" r="34"/>
+                <path d="M168,92 C150,100 118,112 100,128 C88,140 84,160 86,180 C90,240 96,300 104,352 C108,382 104,404 112,428 C122,452 130,470 132,500 L138,768 Q139,786 156,786 L182,786 Q192,786 192,772 L194,560 Q196,540 200,540 Q204,540 206,560 L208,772 Q208,786 218,786 L244,786 Q261,786 262,768 L268,500 C270,470 278,452 288,428 C296,404 292,382 296,352 C304,300 310,240 314,180 C316,160 312,140 300,128 C282,112 250,100 232,92 C224,88 216,86 200,86 C184,86 176,88 168,92 Z"/>
+                <path d="M100,128 C80,142 70,182 68,242 L66,330 Q66,346 79,346 L87,346 Q96,346 97,332 L102,250 C104,218 108,188 112,168 Z"/>
+                <path d="M300,128 C320,142 330,182 332,242 L334,330 Q334,346 321,346 L313,346 Q304,346 303,332 L298,250 C296,218 292,188 288,168 Z"/>
+              </g>
+              <!-- 皮节标签 + 点击热区 -->
+              <g v-for="(d,i) in dermList" :key="'t'+d">
+                <text x="12" :y="bandYC(i)+4" class="derm-label">{{ d }}</text>
+                <text x="388" :y="bandYC(i)+4" text-anchor="end" class="derm-label">{{ d }}</text>
+                <rect x="0" :y="bandY0(i)" width="400" :height="bandH" fill="transparent"
+                      style="cursor:pointer" @click="togglePain(d)"/>
+              </g>
+              <!-- 触点位置标记 -->
+              <g v-for="c in currentPatient.contacts" :key="'m'+c.id">
+                <circle :cx="bodyContactX(c)" :cy="c.y" r="6"
+                        :fill="c.polarity==='off'? '#94a3b8' : (c.polarity==='cathode'? '#1d4ed8':'#dc2626')"
+                        stroke="#fff" stroke-width="1.5"/>
+                <text :x="bodyContactX(c)+10" :y="c.y+4" class="contact-no">#{{ c.id }}</text>
+              </g>
+            </svg>
+            <div class="legend">
+              <span><i class="sw cov"></i>刺激覆盖（深浅=电流强度）</span>
+              <span><i class="sw pain"></i>患者疼痛区</span>
+              <span><i class="sw both"></i>重合区</span>
+              <span><i class="dot cathode"></i>阴极 <i class="dot anode"></i>阳极 <i class="dot off"></i>关闭</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>覆盖评价</h2>
+          <div class="overlap-box" :class="overlapClass">
+            <div class="overlap-num">{{ overlapRate===null ? '—' : overlapRate + '%' }}</div>
+            <div class="overlap-label">疼痛区重合率</div>
+          </div>
+          <div class="alert warn" v-if="overlapRate!==null && overlapRate<60">
+            ⚠ 重合率低于 60%，建议更换极性组合或触点组合后重新模拟。
+          </div>
+          <div class="alert ok" v-else-if="overlapRate!==null">✓ 覆盖达标（≥60%）。</div>
+          <div class="alert info" v-if="!currentPatient.painRegions.length">尚未标记疼痛区域，请在左侧皮节图上点击标记。</div>
+
+          <div class="pain-chips" v-if="currentPatient.painRegions.length">
+            <span class="chip pain-chip" v-for="d in currentPatient.painRegions" :key="d">{{ d }}
+              <b @click="togglePain(d)">×</b></span>
+            <button class="btn xs" @click="currentPatient.painRegions=[]">清空</button>
+          </div>
+
+          <h3>程序组（A / B / C）</h3>
+          <div class="prog-groups">
+            <div v-for="g in ['A','B','C']" :key="g" class="prog-card" :class="{filled: currentPatient.programs[g]}">
+              <div class="prog-head">
+                <b>程序 {{ g }}</b>
+                <span v-if="currentPatient.programs[g]" class="prog-meta">
+                  重合率 {{ currentPatient.programs[g].coverageRate===null?'—':currentPatient.programs[g].coverageRate+'%' }}
+                  · {{ currentPatient.programs[g].savedAt }}
+                </span>
+              </div>
+              <div class="prog-note" v-if="currentPatient.programs[g] && currentPatient.programs[g].note">备注：{{ currentPatient.programs[g].note }}</div>
+              <div class="btn-row">
+                <button class="btn xs primary" @click="saveProgram(g)" :disabled="!canProgram">保存当前方案</button>
+                <button class="btn xs" v-if="currentPatient.programs[g]" @click="loadProgram(g)" :disabled="!canProgram">调入</button>
+                <button class="btn xs danger" v-if="currentPatient.programs[g]" @click="deleteProgram(g)" :disabled="!canProgram">删除</button>
+              </div>
+            </div>
+          </div>
+          <div class="btn-row">
+            <button class="btn" @click="exportCoverageSVG">导出覆盖图 (SVG)</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================= -->
+    <!-- 模块四：程控记录                                   -->
+    <!-- ================================================= -->
+    <section v-if="tab==='records'" class="module">
+      <div v-if="!currentPatient" class="card empty">请先在「植入登记」选择或登记患者。</div>
+      <template v-else>
+        <div class="card">
+          <h2>新建程控单 <button class="btn xs" @click="showRecForm=!showRecForm">{{ showRecForm?'收起':'展开' }}</button></h2>
+          <div v-if="showRecForm">
+            <div class="form-grid">
+              <label>日期<input type="date" v-model="recForm.date"></label>
+              <label>技师<input v-model.trim="recForm.technician" placeholder="操作技师"></label>
+              <label>程序组
+                <select v-model="recForm.group"><option>A</option><option>B</option><option>C</option><option>自定义</option></select>
+              </label>
+              <label>患者 VAS（{{ recForm.vas }}）
+                <input type="range" min="0" max="10" step="1" v-model.number="recForm.vas">
+              </label>
+            </div>
+            <label class="block-label">参数变化说明
+              <textarea v-model="recForm.paramChanges" rows="2" placeholder="如：触点#3 阴极 40%→55%，触点#5 关闭，频率 40Hz 不变"></textarea>
+            </label>
+            <div class="imp-grid">
+              <div class="imp-title">阻抗（Ω，正常 {{ zMin }}–{{ zMax }}）</div>
+              <label v-for="c in currentPatient.contacts" :key="c.id" class="imp-cell">
+                #{{ c.id }}<input type="number" min="0" max="9999" v-model.number="recForm.impedances[c.id]">
+              </label>
+            </div>
+            <p class="hint">当前模拟重合率 {{ overlapRate===null?'—':overlapRate+'%' }} 将随程控单一同保存。</p>
+            <div class="btn-row">
+              <button class="btn" @click="saveRecord('draft')" :disabled="!canProgram">存为草稿</button>
+              <button class="btn primary" @click="saveRecord('implemented')" :disabled="!canProgram">保存并标记已实施</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>历次程控对比
+            <span class="head-ops">
+              <button class="btn xs" @click="exportRecordsCSV">导出程控记录 (CSV)</button>
+              <button class="btn xs" @click="exportPatientJSON">导出患者数据 (JSON)</button>
+            </span>
+          </h2>
+          <div v-if="patientRecords.length" class="chart-wrap">
+            <svg viewBox="0 0 640 220" class="chart">
+              <line x1="50" y1="20" x2="50" y2="180" stroke="#94a3b8"/>
+              <line x1="50" y1="180" x2="620" y2="180" stroke="#94a3b8"/>
+              <text x="8" y="40" class="axis">VAS</text>
+              <text x="8" y="60" class="axis">10</text>
+              <text x="8" y="180" class="axis">0</text>
+              <text x="600" y="40" class="axis">重合率</text>
+              <text x="596" y="60" class="axis">100%</text>
+              <polyline :points="chartPoints('vas')" fill="none" stroke="#dc2626" stroke-width="2"/>
+              <polyline :points="chartPoints('cov')" fill="none" stroke="#2563eb" stroke-width="2" stroke-dasharray="5 3"/>
+              <g v-for="(pt,i) in chartDots" :key="i">
+                <circle :cx="pt.x" :cy="pt.vasY" r="3.5" fill="#dc2626"><title>{{ pt.label }} VAS {{ pt.vas }}</title></circle>
+                <circle v-if="pt.covY!==null" :cx="pt.x" :cy="pt.covY" r="3.5" fill="#2563eb"><title>{{ pt.label }} 重合率 {{ pt.cov }}%</title></circle>
+              </g>
+              <g v-for="(pt,i) in chartDots" :key="'x'+i">
+                <text :x="pt.x" y="200" text-anchor="middle" class="axis">{{ pt.shortDate }}</text>
+              </g>
+            </svg>
+            <div class="legend"><span><i class="sw vas"></i>VAS</span><span><i class="sw covr"></i>重合率</span></div>
+          </div>
+          <p class="hint" v-else>暂无程控记录。</p>
+
+          <table class="tbl" v-if="patientRecords.length">
+            <thead><tr><th>日期</th><th>技师</th><th>程序组</th><th>VAS</th><th>重合率</th><th>状态</th><th>警示</th><th>操作</th></tr></thead>
+            <tbody>
+              <tr v-for="r in patientRecords" :key="r.id" :class="{flagged: recordFlags(r).length}">
+                <td>{{ r.date }}</td><td>{{ r.technician }}</td><td>{{ r.group }}</td>
+                <td><b :class="{bad: r.vas>=7}">{{ r.vas }}</b></td>
+                <td>{{ r.coverageRate===null?'—':r.coverageRate+'%' }}</td>
+                <td><span class="badge" :class="r.status">{{ statusLabel(r.status) }}</span>
+                  <div class="review-note" v-if="r.reviewComment">意见：{{ r.reviewComment }}（{{ r.reviewer }}）</div>
+                </td>
+                <td>
+                  <div v-for="f in recordFlags(r)" :key="f" class="flag">⚠ {{ f }}</div>
+                  <div v-if="recordFlags(r).length" class="flag strong">怀疑电极移位，建议影像复查</div>
+                </td>
+                <td class="ops">
+                  <button class="btn xs" v-if="r.status==='draft' && canProgram" @click="setStatus(r,'implemented')">标记已实施</button>
+                  <button class="btn xs primary" v-if="r.status==='implemented' && canReview" @click="setStatus(r,'reviewed')">复核通过</button>
+                  <button class="btn xs warn" v-if="r.status==='implemented' && canReview" @click="returnRecord(r)">退回</button>
+                  <button class="btn xs" v-if="r.status==='returned' && canProgram" @click="setStatus(r,'implemented')">重新提交</button>
+                  <button class="btn xs danger" v-if="(r.status==='draft'||r.status==='returned') && canProgram" @click="deleteRecord(r)">删除</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </template>
+    </section>
+
+    <!-- ================================================= -->
+    <!-- 模块五：随访评价                                   -->
+    <!-- ================================================= -->
+    <section v-if="tab==='followup'" class="module">
+      <div class="grid-2">
+        <div>
+          <div class="card" v-if="currentPatient">
+            <h2>新增随访 — {{ currentPatient.name }}</h2>
+            <div class="form-grid">
+              <label>日期<input type="date" v-model="fuForm.date"></label>
+              <label>VAS（{{ fuForm.vas }}）<input type="range" min="0" max="10" step="1" v-model.number="fuForm.vas"></label>
+              <label>满意度
+                <select v-model="fuForm.satisfaction">
+                  <option>非常满意</option><option>满意</option><option>一般</option><option>不满意</option>
+                </select>
+              </label>
+              <label>异感覆盖
+                <select v-model="fuForm.paresthesia">
+                  <option>覆盖良好</option><option>部分覆盖</option><option>覆盖差</option><option>无异感</option>
+                </select>
+              </label>
+            </div>
+            <label class="block-label">备注<textarea v-model="fuForm.notes" rows="2" placeholder="镇痛药变化、不良反应、患者主诉等"></textarea></label>
+            <div class="btn-row">
+              <button class="btn primary" @click="saveFollowup" :disabled="!canFollowup">保存随访</button>
+            </div>
+            <p class="hint" v-if="!canFollowup">当前角色不可录入随访（需随访护士或医师）。</p>
+          </div>
+          <div class="card empty" v-else>请先在「植入登记」选择或登记患者。</div>
+
+          <div class="card" v-if="currentPatient">
+            <h2>随访记录与 VAS 趋势</h2>
+            <div v-if="vasTrend.length>1" class="chart-wrap">
+              <svg viewBox="0 0 640 200" class="chart">
+                <line x1="50" y1="15" x2="50" y2="165" stroke="#94a3b8"/>
+                <line x1="50" y1="165" x2="620" y2="165" stroke="#94a3b8"/>
+                <text x="20" y="30" class="axis">10</text><text x="26" y="165" class="axis">0</text>
+                <polyline :points="trendPoints" fill="none" stroke="#dc2626" stroke-width="2"/>
+                <g v-for="(pt,i) in trendDots" :key="i">
+                  <circle :cx="pt.x" :cy="pt.y" r="4" :fill="pt.src==='随访'?'#dc2626':'#9333ea'">
+                    <title>{{ pt.date }}（{{ pt.src }}）VAS {{ pt.vas }}</title></circle>
+                  <text :x="pt.x" y="185" text-anchor="middle" class="axis">{{ pt.shortDate }}</text>
+                </g>
+              </svg>
+              <div class="legend"><span><i class="sw vas"></i>随访 VAS</span><span><i class="sw rec"></i>程控 VAS</span></div>
+            </div>
+            <table class="tbl" v-if="patientFollowups.length">
+              <thead><tr><th>日期</th><th>VAS</th><th>较术前</th><th>满意度</th><th>异感覆盖</th><th>备注</th><th></th></tr></thead>
+              <tbody>
+                <tr v-for="f in patientFollowups" :key="f.id">
+                  <td>{{ f.date }}</td><td><b>{{ f.vas }}</b></td>
+                  <td :class="{good: vasDropPct(f)>=50}">{{ vasDropPct(f)===null?'—':vasDropPct(f)+'%' }}</td>
+                  <td>{{ f.satisfaction }}</td><td>{{ f.paresthesia }}</td><td>{{ f.notes }}</td>
+                  <td><button class="btn xs danger" @click="deleteFollowup(f)" v-if="canFollowup">删除</button></td>
+                </tr>
+              </tbody>
+            </table>
+            <p class="hint" v-else>暂无随访记录。</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>医师镇痛效果统计（VAS 下降）</h2>
+          <table class="tbl" v-if="physicianStats.length">
+            <thead><tr><th>医师</th><th>患者数</th><th>平均术前VAS</th><th>平均最近VAS</th><th>平均下降</th><th>有效率(≥50%)</th></tr></thead>
+            <tbody>
+              <tr v-for="s in physicianStats" :key="s.physician">
+                <td>{{ s.physician }}</td><td>{{ s.n }}</td>
+                <td>{{ s.avgBaseline }}</td><td>{{ s.avgLatest }}</td>
+                <td><b :class="{good: s.avgDropPct>=50}">{{ s.avgDrop }}（{{ s.avgDropPct }}%）</b></td>
+                <td>{{ s.responders }}/{{ s.n }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="hint" v-else>暂无数据。</p>
+          <div v-if="physicianStats.length" class="chart-wrap">
+            <svg :viewBox="'0 0 640 ' + (physicianStats.length*46+40)" class="chart">
+              <g v-for="(s,i) in physicianStats" :key="s.physician">
+                <text x="8" :y="34+i*46" class="bar-label">{{ s.physician }}</text>
+                <rect x="110" :y="18+i*46" :width="s.avgDropPct*4.6" height="20" rx="3"
+                      :fill="s.avgDropPct>=50? '#16a34a':'#d97706'"/>
+                <text :x="118+s.avgDropPct*4.6" :y="34+i*46" class="bar-val">{{ s.avgDropPct }}%</text>
+              </g>
+              <line x1="110" :y1="10" x2="110" :y2="physicianStats.length*46+10" stroke="#94a3b8"/>
+              <line :x1="110+50*4.6" :y1="10" :x2="110+50*4.6" :y2="physicianStats.length*46+10" stroke="#16a34a" stroke-dasharray="4 4"/>
+              <text :x="110+50*4.6" :y="physicianStats.length*46+28" text-anchor="middle" class="axis">50% 有效线</text>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    数据保存在本机浏览器 localStorage · 本系统为临床辅助模拟工具，最终程控参数以医嘱为准
+    <button class="btn xs" v-if="!db.patients.length" @click="loadDemo">载入演示数据</button>
+  </footer>
+</div>
+<script src="vendor/vue.global.prod.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
