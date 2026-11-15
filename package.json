@@ -1,0 +1,20 @@
+{
+  "name": "spine-puncture-planner",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "疼痛科脊柱介入穿刺路径三维规划与审签系统",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.171.0",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "vite": "^6.0.7"
+  }
+}
