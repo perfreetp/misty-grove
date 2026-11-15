@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>基板层叠与球阵可视化评审平台</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="app-header">
+  <div class="brand">
+    <span class="brand-mark">◈</span>
+    <div>
+      <div class="brand-title">基板层叠与球阵评审平台</div>
+      <div class="brand-sub">Substrate Stackup &amp; BGA Review · WebGPU</div>
+    </div>
+  </div>
+  <div class="header-controls">
+    <label class="ctl">
+      <span>项目</span>
+      <select id="projectSelect"></select>
+    </label>
+    <button class="btn" id="newProjectBtn">新建封装项目</button>
+    <label class="ctl">
+      <span>当前角色</span>
+      <select id="roleSelect">
+        <option value="designer">设计员</option>
+        <option value="process">工艺工程师</option>
+        <option value="customer">客户</option>
+      </select>
+    </label>
+    <span class="save-pill" id="savePill">已保存</span>
+  </div>
+</header>
+<div class="app-body">
+  <nav class="sidebar" id="sidebar"></nav>
+  <main class="main" id="mainView"></main>
+</div>
+<div id="modalRoot"></div>
+<div id="toastRoot"></div>
+
+<script src="js/util/mat4.js"></script>
+<script src="js/util/geometry.js"></script>
+<script src="js/webgpu/gpu.js"></script>
+<script src="js/store.js"></script>
+<script src="js/validation.js"></script>
+<script src="js/export.js"></script>
+<script src="js/bga2d.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/views/dashboard.js"></script>
+<script src="js/views/stackup.js"></script>
+<script src="js/views/stackup3d.js"></script>
+<script src="js/views/bga.js"></script>
+<script src="js/views/review.js"></script>
+<script src="js/views/materials.js"></script>
+<script src="js/views/customer.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
