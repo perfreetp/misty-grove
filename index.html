@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9B%B0%3C/text%3E%3C/svg%3E" />
+    <title>深路堑边坡防护布置与验收批次系统</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <div class="brand">
+          <span class="logo">⛰</span>
+          <div>
+            <h1>高速公路深路堑边坡防护布置与验收批次系统</h1>
+            <p class="sub">三维坡面布置 · 自动框架梁 · 工程量统计 · 验收批次签认</p>
+          </div>
+        </div>
+        <div class="top-actions">
+          <label class="role-switch">当前角色
+            <select id="roleSelect">
+              <option value="designer">设计员</option>
+              <option value="crew">施工班组</option>
+              <option value="supervisor">监理</option>
+            </select>
+          </label>
+          <button id="exportCsvBtn" class="btn">导出工程量清单</button>
+          <button id="exportJsonBtn" class="btn ghost">导出项目JSON</button>
+          <button id="importJsonBtn" class="btn ghost">导入</button>
+          <input type="file" id="importFile" accept="application/json" hidden />
+        </div>
+      </header>
+      <main class="layout">
+        <aside class="panel left" id="leftPanel"></aside>
+        <section class="viewport">
+          <canvas id="glCanvas"></canvas>
+          <div class="hud" id="hud"></div>
+          <div class="label-layer" id="labelLayer"></div>
+          <div class="legend" id="legend"></div>
+          <div class="tooltip" id="tooltip" hidden></div>
+        </section>
+        <aside class="panel right" id="rightPanel"></aside>
+      </main>
+      <div id="toastRoot" class="toast-root"></div>
+      <div id="modalRoot"></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

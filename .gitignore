@@ -16,3 +16,10 @@ node_modules/
 __pycache__/
 .venv/
 venv/
+dist/
+test/dl/
+test/*.mjs
+test/*.log
+test/*.png
+slope-shot.png
+*.local
