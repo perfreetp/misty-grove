@@ -1,0 +1,3 @@
+* { box-sizing: border-box; }
+html, body, #app { height: 100%; margin: 0; }
+body { font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif; color: #223; background: #eef1f4; }
