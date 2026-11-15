@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>高速公路服务区危化品车辆分区停放与巡查系统</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app">
+  <!-- 顶栏 -->
+  <header id="topbar">
+    <div class="brand">
+      <span class="brand-logo">⛽</span>
+      <div>
+        <div class="brand-title">服务区危化品车辆分区停放与巡查系统</div>
+        <div class="brand-sub">Hazmat Vehicle Zoning Parking &amp; Patrol Platform · 三维可视化管理</div>
+      </div>
+    </div>
+    <div class="top-right">
+      <div class="sim-clock">
+        <div>模拟时间 <span id="simTime">--</span></div>
+        <div class="speed-ctl">
+          倍速
+          <button data-speed="1" class="speed-btn active">1×</button>
+          <button data-speed="60" class="speed-btn">60×</button>
+          <button data-speed="600" class="speed-btn">600×</button>
+          <button data-speed="3600" class="speed-btn">3600×</button>
+        </div>
+      </div>
+      <div class="role-switch">
+        <label>当前角色</label>
+        <select id="roleSelect">
+          <option value="admin">服务区管理员</option>
+          <option value="inspector">巡查员</option>
+          <option value="supervisor">主管</option>
+        </select>
+      </div>
+      <button id="resetDemoBtn" class="btn btn-ghost" title="清空并恢复演示数据">重置演示数据</button>
+    </div>
+  </header>
+
+  <div id="main">
+    <!-- 左侧功能面板 -->
+    <aside id="sidebar">
+      <nav id="navTabs"></nav>
+      <div id="panelBody"></div>
+    </aside>
+
+    <!-- 三维视图 -->
+    <section id="viewport">
+      <div id="sceneToolbar">
+        <span class="legend-title">图例：</span>
+        <span class="legend-item"><i class="dot dot-hazmat"></i>危化品车位</span>
+        <span class="legend-item"><i class="dot dot-truck"></i>普通货车位</span>
+        <span class="legend-item"><i class="dot dot-car"></i>小车位</span>
+        <span class="legend-item"><i class="dot dot-violation"></i>不合规/告警</span>
+        <span class="legend-item"><i class="dot dot-landmark"></i>加油站/餐厅</span>
+        <span id="viewModeHint" class="view-hint"></span>
+        <span class="spacer"></span>
+        <button id="btnTopView" class="btn btn-small">俯视平面图视角</button>
+        <button id="btnPerspective" class="btn btn-small">透视视角</button>
+      </div>
+      <div id="threeContainer"></div>
+      <div id="sceneStatus" class="scene-status"></div>
+      <div id="spotTip" class="spot-tip" hidden></div>
+    </section>
+  </div>
+
+  <!-- 全局告警条 -->
+  <div id="alertTicker" hidden>
+    <span class="ticker-icon">⚠</span>
+    <span id="alertTickerText"></span>
+    <button id="tickerGo" class="btn btn-small btn-danger-text">前往处置</button>
+    <button id="tickerClose" class="btn btn-small">×</button>
+  </div>
+</div>
+
+<!-- 通用弹窗 -->
+<div id="modalMask" class="modal-mask" hidden>
+  <div class="modal" id="modalBox">
+    <div class="modal-head">
+      <h3 id="modalTitle"></h3>
+      <button class="modal-close" id="modalClose">×</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<!-- 轻提示 -->
+<div id="toast" hidden></div>
+
+<script src="vendor/three.min.js"></script>
+<script>if (!window.THREE) document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>');</script>
+<script src="vendor/OrbitControls.js"></script>
+<script>if (!THREE.OrbitControls) document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"><\/script>');</script>
+<script src="vendor/TransformControls.js"></script>
+<script>if (!THREE.TransformControls) document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TransformControls.js"><\/script>');</script>
+<script src="app.js"></script>
+</body>
+</html>

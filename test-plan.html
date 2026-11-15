@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>PLAN VIEW TEST</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app">
+  <header id="topbar"><div class="brand"><div class="brand-title">t</div></div>
+    <div class="top-right"><div class="sim-clock"><span id="simTime"></span>
+      <div class="speed-ctl">
+        <button data-speed="1" class="speed-btn">1</button><button data-speed="60" class="speed-btn">60</button>
+        <button data-speed="600" class="speed-btn">600</button><button data-speed="3600" class="speed-btn">3600</button>
+      </div></div>
+      <div class="role-switch"><select id="roleSelect"><option value="admin">a</option></select></div>
+      <button id="resetDemoBtn">r</button></div></header>
+  <div id="main">
+    <aside id="sidebar"><nav id="navTabs"></nav><div id="panelBody"></div></aside>
+    <section id="viewport"><div id="sceneToolbar"><span id="viewModeHint"></span>
+      <button id="btnTopView">t</button><button id="btnPerspective">p</button></div>
+      <div id="threeContainer"></div><div id="sceneStatus"></div><div id="spotTip" hidden></div></section>
+  </div>
+  <div id="alertTicker" hidden><span id="alertTickerText"></span><button id="tickerGo">g</button><button id="tickerClose">x</button></div>
+</div>
+<div id="modalMask" class="modal-mask" hidden><div class="modal"><div class="modal-head"><h3 id="modalTitle"></h3>
+  <button id="modalClose">x</button></div><div class="modal-body" id="modalBody"></div></div></div>
+<div id="toast" hidden></div>
+<script src="vendor/three.min.js"></script>
+<script>if (!window.THREE) document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>');</script>
+<script src="vendor/OrbitControls.js"></script>
+<script>if (!THREE.OrbitControls) document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"><\/script>');</script>
+<script src="vendor/TransformControls.js"></script>
+<script>if (!THREE.TransformControls) document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TransformControls.js"><\/script>');</script>
+<script src="app.js"></script>
+<script>
+requestAnimationFrame(() => setTimeout(() => {
+  // 制造不合规：危化品区拖到加油站旁 + 容量不足，验证标红
+  const hz = state.zones.find(z => z.type === 'hazmat');
+  hz.x = -40; hz.z = -28;
+  resizeZone(hz.id, 3);
+  // 切到俯视相机（与导出 PNG 同一视角）
+  camera.position.set(0, 150, 0.01);
+  orbit.target.set(0, 0, 0);
+  currentTab = 'compliance';
+  renderNav(); renderPanel(); updateSceneStatus();
+  setTimeout(() => {
+    const pre = document.createElement('div');
+    pre.id = 'done-flag';
+    pre.textContent = 'PLAN-READY';
+    pre.style.cssText = 'position:fixed;top:0;left:0;color:#0f0;z-index:9999';
+    document.body.appendChild(pre);
+  }, 800);
+}, 400));
+</script>
+</body>
+</html>

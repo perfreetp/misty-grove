@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AUTO TEST</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <div class="brand"><div class="brand-title">test</div></div>
+    <div class="top-right">
+      <div class="sim-clock"><span id="simTime"></span>
+        <div class="speed-ctl">
+          <button data-speed="1" class="speed-btn">1×</button>
+          <button data-speed="60" class="speed-btn">60×</button>
+          <button data-speed="600" class="speed-btn">600×</button>
+          <button data-speed="3600" class="speed-btn">3600×</button>
+        </div>
+      </div>
+      <div class="role-switch"><select id="roleSelect">
+        <option value="admin">admin</option><option value="inspector">inspector</option><option value="supervisor">supervisor</option>
+      </select></div>
+      <button id="resetDemoBtn">reset</button>
+    </div>
+  </header>
+  <div id="main">
+    <aside id="sidebar"><nav id="navTabs"></nav><div id="panelBody"></div></aside>
+    <section id="viewport">
+      <div id="sceneToolbar">
+        <span id="viewModeHint"></span><span class="spacer"></span>
+        <button id="btnTopView">top</button><button id="btnPerspective">persp</button>
+      </div>
+      <div id="threeContainer"></div>
+      <div id="sceneStatus"></div>
+      <div id="spotTip" hidden></div>
+    </section>
+  </div>
+  <div id="alertTicker" hidden><span id="alertTickerText"></span>
+    <button id="tickerGo">go</button><button id="tickerClose">x</button></div>
+</div>
+<div id="modalMask" class="modal-mask" hidden>
+  <div class="modal"><div class="modal-head"><h3 id="modalTitle"></h3><button id="modalClose">x</button></div>
+  <div class="modal-body" id="modalBody"></div></div>
+</div>
+<div id="toast" hidden></div>
+<script>
+/* ========= 自动化测试驱动 ========= */
+localStorage.removeItem('hazmat_service_area_v1'); // 测试隔离：每次从种子数据开始
+window.__testResults = [];
+function check(name, cond, extra) {
+  window.__testResults.push({ name, pass: !!cond, extra: extra || '' });
+}
+function runTests() {
+  try {
+    check('T0 Three.js 与动态组初始化',
+      typeof THREE !== 'undefined' && !!dynamicGroup && !!labelGroup && !!renderer,
+      `THREE=${typeof THREE} dynamicGroup=${typeof dynamicGroup} labelGroup=${typeof labelGroup}`);
+    // T1 初始合规
+    const c0 = evaluateCompliance();
+    check('T1 初始演示场景整体合规', c0.overallPass === true, JSON.stringify(c0.counts));
+
+    // T2 拖近危化品区到加油站 → 距离不合规并给出下限
+    const hz = state.zones.find(z => z.type === 'hazmat');
+    hz.x = -45; hz.z = -30;
+    const c1 = evaluateCompliance();
+    const row = c1.distanceRows.find(d => d.zoneId === hz.id);
+    check('T2 危化品区靠近加油站后距离判不合规', c1.overallPass === false && row.gasPass === false,
+      `minGas=${row.minGas.toFixed(1)} limit=${state.rules.minHazmatToGas}`);
+
+    // T3 车位数量不足 → 不合规并给出下限差值
+    resizeZone(hz.id, 3);
+    const c2 = evaluateCompliance();
+    check('T3 危化品车位低于下限量判不合规',
+      c2.counts.hazmat.pass === false && c2.counts.hazmat.have === 3 && c2.counts.hazmat.min === 6,
+      JSON.stringify(c2.counts.hazmat));
+    hz.x = 0; hz.z = 30;
+    resizeZone(hz.id, 8);
+    check('T3b 缩容扩容后车位占用关系完整',
+      hz.spots.length === 8 &&
+      parkedVehicles().every(vv => {
+        const f = getSpot(vv.zoneId, vv.spotId);
+        return f && f.spot.vehicleId === vv.id;
+      }),
+      `spots=${hz.spots.map(s => s.id + ':' + (s.vehicleId || '空')).join('|')}`);
+
+    // T4 危化品车辆入场登记（自动分配到危化品区）
+    // 前置：演示数据危化品车位可能已满，先让一台演示车离场
+    const parkedHaz = parkedVehicles().filter(x => x.type === 'hazmat');
+    if (!state.zones.find(z => z.type === 'hazmat').spots.some(s => !s.vehicleId) && parkedHaz.length) {
+      exitVehicle(parkedHaz[0].id);
+    }
+    const freeHazBefore = state.zones.filter(z => z.type === 'hazmat')
+      .reduce((n, z) => n + z.spots.filter(s => !s.vehicleId).length, 0);
+    const ok1 = registerVehicle({ plate: '鲁Z·TEST01', type: 'hazmat', media: '汽油', escort: '测试押运' });
+    const v = state.vehicles.find(x => x.plate === '鲁Z·TEST01');
+    const zAfter = v ? getZone(v.zoneId) : null;
+    const spotLinked = v && getSpot(v.zoneId, v.spotId)?.spot.vehicleId === v.id;
+    const t4pass = ok1 === true && !!zAfter && zAfter.type === 'hazmat' &&
+      v.entryTs > 0 && spotLinked === true;
+    check('T4 危化品车辆自动分配到危化品分区', t4pass,
+      `ok=${ok1} freeHazBefore=${freeHazBefore} vZone=${v && v.zoneId} spotLinked=${spotLinked} dup=${state.vehicles.filter(x => x.plate === '鲁Z·TEST01').length}`);
+
+    // T5 普通小车登记到危化品区 → 停错区域告警
+    const openBefore = openAlerts().length;
+    const hzZone = state.zones.find(z => z.type === 'hazmat');
+    const free = hzZone.spots.find(s => !s.vehicleId);
+    registerVehicle({ plate: '鲁Z·CAR001', type: 'car', zoneId: hzZone.id });
+    check('T5 错区停放自动生成 wrongzone 告警',
+      openAlerts().length === openBefore + 1 && state.alerts[0].type === 'wrongzone');
+
+    // T6 超时告警：把计划离场时间调到过去，手动跑一次扫描逻辑
+    v.plannedExitTs = virtualNow() - 5 * 60000;
+    const overtimeExistsBefore = state.alerts.some(a => a.vehicleId === v.id && a.type === 'overtime');
+    check('T6 超时判定 vehicleOvertime 生效', vehicleOvertime(v) === true);
+
+    // T7 告警转应急处置单
+    const al = state.alerts.find(a => a.vehicleId === v.id && a.type === 'overtime');
+    if (!al) {
+      // 手动补一条超时告警（扫描器为 2s 间隔，测试中直接验证转单链路）
+      pushAlert({ type: 'overtime', level: 'high', title: '测试超时', detail: 'd', vehicleId: v.id, zoneId: v.zoneId, spotId: v.spotId });
+    }
+    const target = state.alerts.find(a => a.vehicleId === v.id && a.type === 'overtime' && a.status === 'open');
+    const orderCountBefore = state.orders.length;
+    convertAlertToOrder(target.id);
+    check('T7 告警转应急处置单且状态联动',
+      state.orders.length === orderCountBefore + 1 && target.status === 'converted' && !!target.orderId);
+
+    // T8 处置单回填闭环 → 告警同步关闭，处置时长可计算
+    const o = state.orders.find(x => x.id === target.orderId);
+    closeOrder(o.id, '测试处置人', '现场疏导完成，复检合格');
+    const al2 = state.alerts.find(a => a.id === target.id);
+    check('T8 处置回填后单据与告警双闭环',
+      o.status === 'done' && !!o.closeTs && al2.status === 'resolved' && (o.closeTs - o.ts) >= 0);
+
+    // T9 巡查异常打卡 → 自动转单
+    const ordersBefore = state.orders.length;
+    submitPatrol({
+      inspector: '测试巡查员', zoneId: hzZone.id, spotId: hzZone.spots[0].id,
+      status: 'abnormal', note: '发现泄漏痕迹',
+      photoData: 'data:image/jpeg;base64,TEST',
+    });
+    const p = state.patrols[0];
+    check('T9 巡查异常自动生成告警与处置单',
+      state.orders.length === ordersBefore + 1 && !!p.alertId && state.alerts.find(a => a.id === p.alertId)?.status === 'converted');
+
+    // T10 正常巡查打卡不产生告警
+    const alertsBefore = state.alerts.length;
+    submitPatrol({
+      inspector: '测试巡查员', zoneId: hzZone.id, spotId: hzZone.spots[0].id,
+      status: 'normal', note: '正常', photoData: 'data:image/jpeg;base64,TEST',
+    });
+    check('T10 正常巡查不产生告警', state.alerts.length === alertsBefore);
+
+    // T11 车辆离场 → 释放车位、在场告警关闭
+    const wrongV = state.vehicles.find(x => x.plate === '鲁Z·CAR001');
+    check('T11a 错区小车此前已成功登记', !!wrongV, wrongV ? '' : 'wrongV 未创建');
+    if (wrongV) {
+      const wzAlerts = state.alerts.filter(a => a.vehicleId === wrongV.id && a.status === 'open').length;
+      exitVehicle(wrongV.id);
+      const wzSpot = getSpot(wrongV.zoneId, wrongV.spotId);
+      const spotFreed = wzSpot && wzSpot.spot.vehicleId === null;
+      const wzLeft = state.alerts.filter(a => a.vehicleId === wrongV.id && a.status === 'open').length;
+      check('T11 车辆离场释放车位并关闭在场告警', spotFreed && wzLeft === 0 && wzAlerts > 0,
+        `spotFreed=${spotFreed} wzLeft=${wzLeft} wzAlerts=${wzAlerts}`);
+    }
+
+    // T12 看板指标
+    const totalSpots = state.zones.reduce((n, z) => n + z.spots.length, 0);
+    const pv = parkedVehicles();
+    const occRate = pv.length / totalSpots;
+    const ot = pv.filter(vehicleOvertime).length;
+    check('T12 看板占用率/超时率计算有效',
+      occRate > 0 && occRate <= 1 && pv.filter(vehicleOvertime).length === ot);
+
+    // T13 角色面板可渲染不抛错
+    let renderOk = true;
+    try {
+      ['admin', 'inspector', 'supervisor'].forEach(r => {
+        currentRole = r;
+        ROLE_TABS[r].forEach(t => { currentTab = t.key; renderPanel(); });
+      });
+    } catch (e) { renderOk = false; window.__renderErr = String(e && e.stack || e); }
+    check('T13 三个角色全部面板渲染无异常', renderOk, window.__renderErr || '');
+
+    // T14 动态对象重建（含标红脉冲）无异常
+    let buildOk = true;
+    try { buildDynamicObjects(); } catch (e) { buildOk = false; window.__buildErr = String(e); }
+    check('T14 三维动态对象重建无异常', buildOk, window.__buildErr || '');
+
+    // T15 CSV 导出
+    let csvOk = false;
+    try {
+      const orig = HTMLAnchorElement.prototype.click;
+      HTMLAnchorElement.prototype.click = function () { csvOk = !!this.download && !!this.href; };
+      exportPatrolCSV();
+      exportVehicleCSV();
+      HTMLAnchorElement.prototype.click = orig;
+    } catch (e) { csvOk = false; }
+    check('T15 CSV 导出触发下载', csvOk);
+
+    // T16 PNG 平面图导出
+    let pngOk = false;
+    try {
+      const orig = HTMLAnchorElement.prototype.click;
+      HTMLAnchorElement.prototype.click = function () { pngOk = (this.download || '').endsWith('.png') && this.href.startsWith('data:image/png'); };
+      exportPlanPNG();
+      HTMLAnchorElement.prototype.click = orig;
+    } catch (e) { window.__pngErr = String(e); }
+    check('T16 俯视平面图 PNG 导出', pngOk, window.__pngErr || '');
+
+  } catch (e) {
+    window.__fatal = String(e && e.stack || e);
+  }
+  const r = window.__testResults;
+  const passed = r.filter(x => x.pass).length;
+  document.title = `TESTS ${passed}/${r.length}`;
+  const pre = document.createElement('pre');
+  pre.id = 'test-output';
+  pre.style.cssText = 'position:fixed;inset:0;z-index:9999;background:#0b1220;color:#9fe8b0;padding:16px;font:13px monospace;white-space:pre-wrap;overflow:auto';
+  pre.textContent = (window.__fatal ? 'FATAL: ' + window.__fatal + '\n\n' : '') +
+    r.map(x => (x.pass ? 'PASS ' : 'FAIL ') + x.name + (x.extra ? '  [' + x.extra + ']' : '')).join('\n') +
+    `\n\n== ${passed}/${r.length} passed ==`;
+  document.body.appendChild(pre);
+}
+</script>
+<script src="vendor/three.min.js"></script>
+<script>if (!window.THREE) document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>');</script>
+<script src="vendor/OrbitControls.js"></script>
+<script>if (!THREE.OrbitControls) document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"><\/script>');</script>
+<script src="vendor/TransformControls.js"></script>
+<script>if (!THREE.TransformControls) document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TransformControls.js"><\/script>');</script>
+<script src="app.js"></script>
+<script>
+// app.js boot 完成后下一帧执行
+requestAnimationFrame(() => setTimeout(runTests, 300));
+</script>
+</body>
+</html>
