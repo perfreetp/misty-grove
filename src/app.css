@@ -1,0 +1,126 @@
+:root {
+  --bg: #0f1622;
+  --panel: #182233;
+  --panel-2: #1f2c42;
+  --border: #2c3d58;
+  --text: #e6edf7;
+  --muted: #93a4bd;
+  --primary: #4f8cff;
+  --primary-d: #3a6fd4;
+  --ok: #37b26c;
+  --warn: #f0b429;
+  --danger: #e05d6f;
+  --purple: #9a7cff;
+  --radius: 10px;
+  font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #app {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+}
+
+button {
+  font: inherit;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+button:hover { border-color: var(--primary); }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+button.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+button.primary:hover { background: var(--primary-d); }
+button.danger { border-color: var(--danger); color: #ffb3bd; }
+button.ghost { background: transparent; }
+button.sm { padding: 3px 9px; font-size: 12px; border-radius: 6px; }
+
+input, select, textarea {
+  font: inherit;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 7px 10px;
+  width: 100%;
+}
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); }
+label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.field { margin-bottom: 12px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: middle; }
+th { color: var(--muted); font-weight: 600; font-size: 12px; white-space: nowrap; }
+tr:hover td { background: rgba(79, 140, 255, 0.06); }
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.card h3 { margin: 0 0 12px; font-size: 15px; }
+
+.badge {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.badge.warn { background: rgba(240, 180, 41, 0.16); border-color: var(--warn); color: var(--warn); }
+.badge.ok { background: rgba(55, 178, 108, 0.15); border-color: var(--ok); color: var(--ok); }
+.badge.info { background: rgba(79, 140, 255, 0.15); border-color: var(--primary); color: var(--primary); }
+.badge.purple { background: rgba(154, 124, 255, 0.16); border-color: var(--purple); color: var(--purple); }
+.badge.danger { background: rgba(224, 93, 111, 0.15); border-color: var(--danger); color: var(--danger); }
+
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+.row { display: flex; gap: 12px; align-items: center; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.flex1 { flex: 1; min-width: 0; }
+.scroll { overflow: auto; }
+
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; }
+.dot.yellow { background: var(--warn); box-shadow: 0 0 6px var(--warn); }
+.dot.blue { background: var(--primary); }
+.dot.gray { background: #6b7c95; }
+.dot.green { background: var(--ok); }
+
+.modal-mask {
+  position: fixed; inset: 0; background: rgba(6, 10, 17, 0.66);
+  display: flex; align-items: center; justify-content: center; z-index: 50;
+}
+.modal {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 12px; padding: 20px; width: min(720px, 94vw);
+  max-height: 90vh; overflow: auto;
+}
+.modal h3 { margin-top: 0; }
+
+.pill-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.pill-tabs button { border-radius: 999px; }
+.pill-tabs button.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+.thumb {
+  width: 74px; height: 74px; object-fit: cover;
+  border-radius: 8px; border: 1px solid var(--border); background: #0c121c;
+}
+.thumb.lg { width: 150px; height: 150px; }
+
+.kbd {
+  font-family: monospace; background: var(--panel-2); border: 1px solid var(--border);
+  border-radius: 5px; padding: 1px 6px; font-size: 11px;
+}
