@@ -1,0 +1,11 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #0b111c;
+  color: #d5dde8;
+  font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+  overflow: hidden;
+}
+#app { height: 100%; }
+* { scrollbar-width: thin; scrollbar-color: #2a3648 transparent; }
